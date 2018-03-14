@@ -345,6 +345,45 @@ public class UserProcess {
 	Lib.assertNotReached("Machine.halt() did not halt machine!");
 	return 0;
     }
+    private int handleExit(){
+    	return 1;
+    	//Daniel and Prab
+    }
+    private int handleExec(){
+    	return 1;
+    	//Daniel and Prab
+    	
+    }
+    private int handleJoin(){
+    	return 1;
+    	//Daniel and Prab
+	
+    }
+    private int handleCreate(){
+    	return 1;
+    	//Danny and Eva
+	
+    }
+    private int handleOpen(){
+    	return 1;
+    	//Danny and Eva
+    }
+    private int handleRead(){
+    	return 1;
+    	//Danny and Eva
+    }
+    private int handleWrite(){
+    	return 1;
+    	//Danny and Eva
+    }
+    private int handleClose(){
+    	return 1;
+    	//Danny and Eva
+    }
+    private int handleUnlink(){
+    	return 1;
+    	//Danny and Eva
+    }
 
 
     private static final int
@@ -391,8 +430,24 @@ public class UserProcess {
 	switch (syscall) {
 	case syscallHalt:
 	    return handleHalt();
-
-
+	case syscallExit:
+		return 1;
+	case syscallExec:
+		return 2;
+	case syscallJoin:
+		return 3;
+	case syscallCreate:
+		return 4;
+	case syscallOpen:
+		return 5;
+	case syscallRead:
+		return 6;
+	case syscallWrite:
+		return 7;
+	case syscallClose:
+		return 8;
+	case syscallUnlink:
+		return 9;
 	default:
 	    Lib.debug(dbgProcess, "Unknown syscall " + syscall);
 	    Lib.assertNotReached("Unknown system call!");
