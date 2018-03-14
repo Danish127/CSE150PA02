@@ -84,12 +84,12 @@ public class Alarm {
    private static boolean test = false;
    public static void selfTest(){
 	long start = Machine.timer().getTime();   	
-	new Alarm().waitUntil(1000);
+	ThreadedKernel.alarm.waitUntil(1000);
 	long finish = Machine.timer().getTime();
 	Lib.assertTrue(finish - start >= 1000);//basic test to check that it waits
 	
-	KThread temp = new KThread(new Runnable(){public void run(){new Alarm().waitUntil(1000); test = false;}}).setName("Bool");
-	KThread temp1 = new KThread(new Runnable(){public void run(){new Alarm().waitUntil(10); test = true;}}).setName("Bool");//testing whether threads are prioritized by finish time
+	KThread temp = new KThread(new Runnable(){public void run(){ThreadedKernel.alarm.waitUntil(1000); test = false;}}).setName("Bool");
+	KThread temp1 = new KThread(new Runnable(){public void run(){ThreadedKernel.alarm.waitUntil(10); test = true;}}).setName("Bool");//testing whether threads are prioritized by finish time
 	temp.fork();
 	temp1.fork();
 	temp1.join();
