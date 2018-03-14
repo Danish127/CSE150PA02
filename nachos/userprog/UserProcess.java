@@ -359,30 +359,118 @@ public class UserProcess {
     	//Daniel and Prab
 	
     }
-    private int handleCreate(){
-    	return 1;
-    	//Danny and Eva
-	
-    }
-    private int handleOpen(){
-    	return 1;
-    	//Danny and Eva
-    }
-    private int handleRead(){
-    	return 1;
-    	//Danny and Eva
-    }
-    private int handleWrite(){
-    	return 1;
-    	//Danny and Eva
-    }
-    private int handleClose(){
-    	return 1;
-    	//Danny and Eva
-    }
+  
+	private int handleCreate(int addr){  // create = 1 if file is created, else 0
+    	//Max length is 256
+    
+   		if(addr < 0){
+        		return -1    //return -1 instead of throwing exceptions
+    		}
+        	name = readVirtualMemoryString(addr, 256);  //name = filename 
+        	if(name < 0)
+            		return -1
+    
+        	Openfile myfile = ThreadedKernal.fileSystem.open(myfile, 1);
+        
+        	int i = 0;
+        	if(myfile == null)
+            		return -1;
+        	else{
+            		myFileList[i] = myfile;
+                	return i;
+        	}
+        	if(i == 15)
+            		return 0;         //list full
+        
+	}
+    	private int handleOpen(int addr){  // create = 1 if file is created, else 0
+    	//Max length is 256
+    
+   		if(addr < 0){
+        		Return -1    //return -1 instead of throwing exceptions
+    		}
+        	name = readVirtualMemoryString(addr, 256);  //name = filename 
+        	if(name < 0)
+            		Return -1
+    
+        	Openfile myfile = ThreadedKernal.fileSystem.open(myfile, 1);
+        
+        	int i = 0;
+        	if(myfile == null)
+            		Return -1;
+        	else{
+            		myFileList[i] = myfile;
+                	Return i;
+        	}
+        	if(i == 15)
+            		Return 0;         //list full
+        
+	}
+
+    	private int handleRead(int i, int size){
+
+		FileDescriptor myfile = fileList[i];
+		int numBytesWrited = 0;
+        	while(size > 0){
+		    Byte[] buffer = new byte[Math.min(size, mazSize)];
+		    Size -=buffer.length;
+		    Int numBytesRead = myfile.file.read(buffer, 0 , buffer.length);
+            	    if(numBytesRead < 0 )
+                	return -1;
+            	    else{
+                	int numBytesNewlyWrited = writeVirtualMemory(addr, buffer, 0, numBytesRead);
+                	if(numBytesNewlyWrited < numBytesRead)
+                    	Return -1
+		        numBytesWrited += numBytesRead;
+		        Addr += numBytesRead;
+		        if(numBytesRead < buffer.length)
+		            break;
+            	   }
+        	}
+		return numBytesWrited;
+	}
+
+    private int handleWrite(int fd, char *buffer, int size){
+    	FileDescriptor myfile = fileList[i];
+        Int numBytesWrited = 0;
+        while(size > 0){
+            Byte[] buffer = new byte[Math.min(size, mazSize)];
+            Size -=buffer.length;
+            Int numBytesRead = readVirtualMemory(addr, buffer);
+            if(numBytesRead < buffer.length )
+                return -1;
+            Else{
+                Int numBytesNewlyWrited = writeVirtualMemory(buffer, 0, buffer.length);        //locked maybe
+                
+                numBytesWrited += numBytesRead;
+                Addr += numBytesRead;
+                if(numBytesNewlyWrited < numBytesRead)
+                    break;
+            }
+        }return numBytesWrited;
+   }
+
+   private public int handleClose(int index){
+        if(myFileList[index] = = null)
+            Return -1
+        myFileList[index].close;
+        myFileList[index] = NULL;
+        return 0;
+   }
     private int handleUnlink(){
-    	return 1;
-    	//Danny and Eva
+    	if(addr < 0){
+        	Return -1    //return -1 instead of throwing exceptions
+    	}
+        name = readVirtualMemoryString(addr, 256);  //name = filename 
+
+        if  (name ==null) 
+            Return -1;
+    
+        if (ThreadedKernal.fileSystem.remove (name);
+            return 0
+
+        return -1
+ 
     }
 
 
@@ -437,7 +525,7 @@ public class UserProcess {
 	case syscallJoin:
 		return 3;
 	case syscallCreate:
-		return 4;
+		return handleCreate();
 	case syscallOpen:
 		return 5;
 	case syscallRead:
