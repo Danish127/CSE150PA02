@@ -43,6 +43,69 @@ public class LotteryScheduler extends PriorityScheduler {
      */
     public ThreadQueue newThreadQueue(boolean transferPriority) {
 	// implement me
-	return null;
+	return new PriorityQueue(transferPriority);
     }
+    protected class LotteryQueue extends PriorityQueue {
+
+	LotteryQueue(boolean transferPriority) {
+		super(transferPriority);
+	}
+
+	public ThreadState pickNextThread() {  //returns next theard, chosen by lottery
+            int nextPriority = priorityMinimum;
+            int total  = getEffectivePriority(); //gets the total number of tickets in the queue
+    	    int target = Lib.random(total); //generates random target, between 0 and total
+
+    	    ThreadState next = null;
+            for (final ThreadState currThread : this.threadWait) {
+		//iterate through threads until target is found
+            	if (target < currThread.getEffectivePriority()){ //Target is within threads tickets
+            		next = currThread;
+           		break;
+            }else //get rid of tickets, move to next thread in queue
+            	target = target - currThread.getEffectivePriority();
+            }
+            return next;
+	}
+
+
+    	public int getEffectivePriority() {//for Lotterey, lead node should have sum of all nodes
+
+		if (!transferPriority) {
+                    return priorityMinimum;
+                }else if (this.priChange) {
+                    // Recalculate effective priorities
+                    this.effPriority = 0;
+                    for (final ThreadState curr : this.threadWait) {
+                            this.effPriority += curr.getEffectivePriority();//sum all priorities
+                    }
+		    this.priChange = false;
+            	}                 
+                return effPriority;        
+	}
+
+    }
+    protected class LotteryState extends ThreadState {
+
+
+	public LotteryState (KThread thread) {
+		super(thread);
+	}
+
+	public int getEffectivePriority() {//for Lotterey, lead node should have sum of all nodes that want resources it holds
+
+            if (this.currentResources.isEmpty()) {
+                return this.getPriority();
+            } else if (this.priChange) {
+                this.effPriority = this.getPriority();
+                for (final PriorityQueue pq : this.currentResources) {
+                    this.effPriority += pq.getEffectivePriority(); //sum of priorities of threads that depend on resources that this thread holds.
+                }
+                this.priChange = false;
+            }
+            return this.effPriority;
+	}
+
+    }
+
 }
