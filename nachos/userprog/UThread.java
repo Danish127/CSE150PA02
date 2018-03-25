@@ -9,6 +9,7 @@ import nachos.userprog.*;
  * process, in addition to Nachos kernel code.
  */ 
 public class UThread extends KThread {
+
     /**
      * Allocate a new UThread.
      */
@@ -72,4 +73,6 @@ public class UThread extends KThread {
      * The process to which this thread belongs.
      */
     public UserProcess process;
+    
+   
 }
