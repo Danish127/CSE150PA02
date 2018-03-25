@@ -25,6 +25,7 @@ public class UserProcess {
 	 * Allocate a new process.
 	 */
 	public UserProcess() {
+		UserKernel.processes.addChild(self);
 		int numPhysPages = Machine.processor().getNumPhysPages();
 		pageTable = new TranslationEntry[numPhysPages];
 		for (int i=0; i<numPhysPages; i++)
@@ -474,10 +475,11 @@ public class UserProcess {
 
 		}
 		//make harder to read^
-
+		
 		UserProcess child = UserProcess.newUserProcess();
 		if(child.execute(file, args)){
-			getProcessFromPID(processId, UserKernel.processes).addChild(child);
+			self.addChild(child);
+			child.self.setParent(self);
 			return child.processId;
 		}
 		/*
@@ -741,4 +743,6 @@ public class UserProcess {
 	private static Random rando = new Random();
 	private static Integer processId = generateUniquePID();
 	private static int status;
+	private Node<UserProcess> self = new Node<UserProcess>(this);
+	
 }
