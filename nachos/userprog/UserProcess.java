@@ -371,9 +371,11 @@ public class UserProcess {
     join(getParent(processId));  //join the current process into the parent
 
 		 */
-		UserKernel.processes
-		if(processIds.getChildren().size() > 1){
-
+		Node<UserProcess> local = getProcessFromPID(processId, UserKernel.processes);
+		if(local.getChildren().size() > 0){
+			for(int i = 0; i < local.getChildren().size(); i++){
+				local.getChildren().get(i).getData().status = status;
+			}
 		}
 		/*if(myChildProcess!=null){
         	myChildProcess.status = status;
@@ -381,18 +383,18 @@ public class UserProcess {
 
 		//close all the opened files
 		for (int i=0; i<16; i++) {              
-			//handleClose(i);
-			handleClose();
+			handleClose(i);
+			//handleClose();
 		}
 
 		//part2 implemented
 		this.unloadSections();
 
-		if(this.process_id==ROOT){
+		//local.
+		if(UserKernel.processes.getChildren().contains(local)){
+		//if(this.process_id==ROOT){
 			Kernel.kernel.terminate();
-		}
-
-		else{
+		} else {
 			KThread.finish();
 			Lib.assertNotReached();
 		}
@@ -446,7 +448,7 @@ public class UserProcess {
 		if(name < 0 || argc < 0 || argv < 0){
 			return -1;
 		}
-		String file = readVirtualMemoryString(name,256);
+		String file = readVirtualMemoryString(name, 256);
 
 		if(file == null){
 			return -1;
@@ -457,16 +459,16 @@ public class UserProcess {
 
 		int byteReceived, argAddress;
 		byte temp[]=new byte[4];
-		for(int i =0; i<argc; i++){
-			byteReceived=readVirtualMemory(argv+i*4,temp);
-			if(byteReceived !=4){
+		for(int i = 0; i < argc; i++){
+			byteReceived=readVirtualMemory(argv + i * 4, temp);
+			if(byteReceived != 4){
 				return -1;
 			}
 
-			argAddress=Lib.bytesToInt(temp, 0);
-			args[i]=readVirtualMemoryString(argAddress, 256);
+			argAddress = Lib.bytesToInt(temp, 0);
+			args[i] = readVirtualMemoryString(argAddress, 256);
 
-			if(args[i]==null){
+			if(args[i] == null){
 				return -1;
 			}
 
@@ -490,9 +492,6 @@ public class UserProcess {
 
 
 		return -1;
-
-
-
 
 		//return 1;
 		//Daniel and Prab
@@ -741,4 +740,5 @@ public class UserProcess {
 
 	private static Random rando = new Random();
 	private static Integer processId = generateUniquePID();
+	private static int status;
 }
