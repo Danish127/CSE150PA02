@@ -364,22 +364,35 @@ public class UserProcess {
     	//Max length is 256
     
    		if(addr < 0){
-        		return -1    //return -1 instead of throwing exceptions
+        		return -1;    //return -1 instead of throwing exceptions
     		}
-        	name = readVirtualMemoryString(addr, 256);  //name = filename 
-        	if(name < 0)
-            		return -1
-    
-        	Openfile myfile = ThreadedKernal.fileSystem.open(myfile, 1);
-        
-        	int i = 0;
-        	if(myfile == null)
+        	String name = readVirtualMemoryString(addr, 256);  //name 
+        	if(name == null) {
             		return -1;
-        	else{
-            		myFileList[i] = myfile;
-                	return i;
         	}
-        	if(i == 15)
+    
+        	OpenFile myFile = Machine.stubFileSystem().open(name, true);//my file created
+        	//OpenFile myfile = ThreadedKernal.fileSystem.open(myfile, true); 
+        	//original implementation
+        
+        
+        	
+        	for(int j = 0; j<16; j++) {
+        		
+        		myFileList[j] = null;
+        		
+        	}
+        	
+        	int i = 0;
+        	if(myFile == null)
+        		return -1;
+        	for (i = 0; i<16; i++) {
+	        	
+        		if (myFileList[i]== null){
+	            		myFileList[i] = myFile;
+	                	return i;
+	        	}
+        	}
             		return 0;         //list full
         
 	}
@@ -387,89 +400,100 @@ public class UserProcess {
     	//Max length is 256
     
    		if(addr < 0){
-        		Return -1    //return -1 instead of throwing exceptions
+        		return -1;    //return -1 instead of throwing exceptions
     		}
-        	name = readVirtualMemoryString(addr, 256);  //name = filename 
-        	if(name < 0)
-            		Return -1
+        	String name = readVirtualMemoryString(addr, 256);  //name = filename 
+        	if(name.length() < 0)
+            		return -1;
     
-        	Openfile myfile = ThreadedKernal.fileSystem.open(myfile, 1);
+        	OpenFile myFile = Machine.stubFileSystem().open(name, false);
+        	//Original Implementation: OpenFile myfile = ThreadedKernal.fileSystem.open(myfile, false);
         
         	int i = 0;
-        	if(myfile == null)
-            		Return -1;
+        	
+        	if(myFile == null)
+            		return -1;
+        	
+        	else if(i == 15)
+            		return 0;         //list full
         	else{
-            		myFileList[i] = myfile;
-                	Return i;
+            		myFileList[i] = myFile; //make a for loop
+                	return i;
         	}
-        	if(i == 15)
-            		Return 0;         //list full
+        	
         
 	}
 
-    	private int handleRead(int i, int size){
+    	private int handleRead(int i, int addr, int size){
 
-		FileDescriptor myfile = fileList[i];
+		OpenFile myfile = myFileList[i];
 		int numBytesWrited = 0;
         	while(size > 0){
-		    Byte[] buffer = new byte[Math.min(size, mazSize)];
-		    Size -=buffer.length;
-		    Int numBytesRead = myfile.file.read(buffer, 0 , buffer.length);
-            	    if(numBytesRead < 0 )
-                	return -1;
+		    byte[] buffer = new byte[Math.min(size, maxSize)];
+		    size -=buffer.length;
+		    int numBytesRead = myfile.read(buffer, 0 , buffer.length);
+            	    if(numBytesRead < 0 ) {
+            	    	return -1;
+            	    }
             	    else{
-                	int numBytesNewlyWrited = writeVirtualMemory(addr, buffer, 0, numBytesRead);
-                	if(numBytesNewlyWrited < numBytesRead)
-                    	Return -1
-		        numBytesWrited += numBytesRead;
-		        Addr += numBytesRead;
-		        if(numBytesRead < buffer.length)
-		            break;
+	                	int numBytesNewlyWrited = writeVirtualMemory(addr, buffer, 0, numBytesRead);
+	                	if(numBytesNewlyWrited < numBytesRead) {
+	                    	return -1;
+	                	}
+				        numBytesWrited += numBytesRead;
+				        addr += numBytesRead;
+				        if(numBytesRead < buffer.length)
+			            break;
             	   }
         	}
 		return numBytesWrited;
 	}
 
-    private int handleWrite(int fd, char *buffer, int size){
-    	FileDescriptor myfile = fileList[i];
-        Int numBytesWrited = 0;
+    private int handleWrite(int i, int addr, int size){
+    	//OpenFile myfile = myFileList[i];
+        int numBytesWrited = 0;
         while(size > 0){
-            Byte[] buffer = new byte[Math.min(size, mazSize)];
-            Size -=buffer.length;
-            Int numBytesRead = readVirtualMemory(addr, buffer);
+            byte[] buffer = new byte[Math.min(size, maxSize)];
+            size -=buffer.length;
+            int numBytesRead = readVirtualMemory(addr, buffer);
             if(numBytesRead < buffer.length )
                 return -1;
-            Else{
-                Int numBytesNewlyWrited = writeVirtualMemory(buffer, 0, buffer.length);        //locked maybe
+            else{
+                int numBytesNewlyWrited = writeVirtualMemory(addr, buffer, 0, buffer.length);        //locked maybe //change buffer to addr?
                 
                 numBytesWrited += numBytesRead;
-                Addr += numBytesRead;
+                addr += numBytesRead;
                 if(numBytesNewlyWrited < numBytesRead)
                     break;
             }
         }return numBytesWrited;
    }
 
-   private public int handleClose(int index){
-        if(myFileList[index] = = null)
-            Return -1
-        myFileList[index].close;
-        myFileList[index] = NULL;
+   private int handleClose(int i){
+        if(myFileList[i] == null)
+            return -1;
+        
+        myFileList[i].close();
+        myFileList[i] = null;
         return 0;
    }
-    private int handleUnlink(){
+    private int handleUnlink(int addr){
     	if(addr < 0){
-        	Return -1    //return -1 instead of throwing exceptions
+        	return -1;    //return -1 instead of throwing exceptions
     	}
-        name = readVirtualMemoryString(addr, 256);  //name = filename 
+        String name = readVirtualMemoryString(addr, 256);  //name = filename 
 
         if  (name ==null) 
-            Return -1;
-    
-        if (ThreadedKernal.fileSystem.remove (name);
-            return 0
+            return -1;
+        Machine.stubFileSystem().remove(name); //remove to free up space for other files to use
+        
+        /*if (ThreadedKernal.fileSystem.remove (name))		//DANNY syntax error. What are you trying to do
+            return 0;
 
-        return -1
+        return -1;
+        */
+        //Original implementation
+        return 0;
  
     }
 
@@ -525,17 +549,17 @@ public class UserProcess {
 	case syscallJoin:
 		return 3;
 	case syscallCreate:
-		return handleCreate();
+		return handleCreate(a0);
 	case syscallOpen:
-		return 5;
+		return handleOpen(a0);
 	case syscallRead:
-		return 6;
+		return handleRead(a0, a1, a2);
 	case syscallWrite:
-		return 7;
+		return handleWrite(a0, a1, a2);
 	case syscallClose:
-		return 8;
+		return handleClose(a0);
 	case syscallUnlink:
-		return 9;
+		return handleUnlink(a0);
 	default:
 	    Lib.debug(dbgProcess, "Unknown syscall " + syscall);
 	    Lib.assertNotReached("Unknown system call!");
@@ -589,4 +613,8 @@ public class UserProcess {
 	
     private static final int pageSize = Processor.pageSize;
     private static final char dbgProcess = 'a';
+    
+    OpenFile[] myFileList;
+    
+    int maxSize = 256;
 }
