@@ -4,6 +4,7 @@ import nachos.machine.*;
 import nachos.threads.*;
 import nachos.userprog.*;
 
+
 import java.io.EOFException;
 
 /**
@@ -27,6 +28,12 @@ public class UserProcess {
 	pageTable = new TranslationEntry[numPhysPages];
 	for (int i=0; i<numPhysPages; i++)
 	    pageTable[i] = new TranslationEntry(i,i, true,false,false,false);
+	
+	myFileList = new OpenFile[16];
+	stdin = UserKernel.console.openForReading();
+	stdout = UserKernel.console.openForWriting();
+	myFileList[0] = stdin;		//first two are stin/stdout as states in syscall.h
+	myFileList[1] = stdout;
     }
     
     /**
@@ -377,15 +384,16 @@ public class UserProcess {
         
         
         	
-        	for(int j = 0; j<16; j++) {
+        	/*for(int j = 0; j<16; j++) { //makes all indexes null each time it is called
         		
         		myFileList[j] = null;
         		
-        	}
+        	} */
         	
-        	int i = 0;
+        	
         	if(myFile == null)
         		return -1;
+        	
         	for (i = 0; i<16; i++) {
 	        	
         		if (myFileList[i]== null){
@@ -393,7 +401,7 @@ public class UserProcess {
 	                	return i;
 	        	}
         	}
-            		return 0;         //list full
+            return -1;         //list full
         
 	}
     	private int handleOpen(int addr){  // create = 1 if file is created, else 0
@@ -409,7 +417,7 @@ public class UserProcess {
         	OpenFile myFile = Machine.stubFileSystem().open(name, false);
         	//Original Implementation: OpenFile myfile = ThreadedKernal.fileSystem.open(myfile, false);
         
-        	int i = 0;
+        	
         	
         	if(myFile == null)
             		return -1;
@@ -615,6 +623,10 @@ public class UserProcess {
     private static final char dbgProcess = 'a';
     
     OpenFile[] myFileList;
+    OpenFile stdin;
+    OpenFile stdout;
     
+    
+    int i;
     int maxSize = 256;
 }
