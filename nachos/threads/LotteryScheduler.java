@@ -83,9 +83,9 @@ public class LotteryScheduler extends PriorityScheduler {
 
     	public int getEffectivePriority() {//for Lotterey, lead node should have sum of all nodes
 
-		if (!transferPriority) {
+		/*if (!transferPriority) {
                     return priorityMinimum;
-                }else if (this.priChange) {
+                }else */if (this.priChange) {
                     // Recalculate effective priorities
                     this.effPriority = 0;
                     for (final ThreadState curr : this.threadWait) {
@@ -111,7 +111,9 @@ public class LotteryScheduler extends PriorityScheduler {
             } else if (this.priChange) {
                 this.effPriority = this.getPriority();
                 for (final PriorityQueue pq : this.currentResources) {
-                    this.effPriority += pq.getEffectivePriority(); //sum of priorities of threads that depend on resources that this thread holds.
+			if(pq.transferPriority){
+                    		this.effPriority += pq.getEffectivePriority(); //sum of priorities of threads that depend on resources that this thread holds.
+			}
                 }
                 this.priChange = false;
             }
