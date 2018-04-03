@@ -368,69 +368,75 @@ public class UserProcess {
     }
   
 	private int handleCreate(int addr){  // create = 1 if file is created, else 0
-    	//Max length is 256
-    
-   		if(addr < 0){
-        		return -1;    //return -1 instead of throwing exceptions
-    		}
-        	String name = readVirtualMemoryString(addr, 256);  //name 
-        	if(name == null) {
-            		return -1;
-        	}
-    
-        	OpenFile myFile = Machine.stubFileSystem().open(name, true);//my file created
-        	//OpenFile myfile = ThreadedKernal.fileSystem.open(myfile, true); 
-        	//original implementation
-        
-        
-        	
-        	/*for(int j = 0; j<16; j++) { //makes all indexes null each time it is called
-        		
-        		myFileList[j] = null;
-        		
-        	} */
-        	
-        	
-        	if(myFile == null)
-        		return -1;
-        	
-        	for (i = 0; i<16; i++) {
-	        	
-        		if (myFileList[i]== null){
-	            		myFileList[i] = myFile;
-	                	return i;
-	        	}
-        	}
+        //Max length is 256
+
+           if(addr < 0){
+                return -1;    //return -1 instead of throwing exceptions
+            }
+            String name = readVirtualMemoryString(addr, 256);  //name 
+            if(name == null) {
+                    return -1;
+            }
+
+            OpenFile myFile = Machine.stubFileSystem().open(name, true);//my file created
+            //OpenFile myfile = ThreadedKernal.fileSystem.open(myfile, true); 
+            //original implementation
+
+
+
+            /*for(int j = 0; j<16; j++) { //makes all indexes null each time it is called
+
+                myFileList[j] = null;
+
+            } */
+
+
+            if(myFile == null)
+                return -1;
+
+            for (i = 0; i<16; i++) {
+
+                if (myFileList[i]== null){
+                        myFileList[i] = myFile;
+                        return i;
+                }
+            }
             return -1;         //list full
-        
-	}
-    	private int handleOpen(int addr){  // create = 1 if file is created, else 0
-    	//Max length is 256
-    
-   		if(addr < 0){
-        		return -1;    //return -1 instead of throwing exceptions
-    		}
-        	String name = readVirtualMemoryString(addr, 256);  //name = filename 
-        	if(name.length() < 0)
-            		return -1;
-    
-        	OpenFile myFile = Machine.stubFileSystem().open(name, false);
-        	//Original Implementation: OpenFile myfile = ThreadedKernal.fileSystem.open(myfile, false);
-        
-        	
-        	
-        	if(myFile == null)
-            		return -1;
-        	
-        	else if(i == 15)
-            		return 0;         //list full
-        	else{
-            		myFileList[i] = myFile; //make a for loop
-                	return i;
-        	}
-        	
-        
-	}
+
+    }
+
+
+
+private int handleOpen(int addr){  // create = 1 if file is created, else 0
+        //Max length is 256
+
+           if(addr < 0){
+                return -1;    //return -1 instead of throwing exceptions
+            }
+            String name = readVirtualMemoryString(addr, 256);  //name = filename 
+            if(name.length() < 0)
+                    return -1;
+
+            OpenFile myFile = Machine.stubFileSystem().open(name, false);
+            //Original Implementation: OpenFile myfile = ThreadedKernal.fileSystem.open(myfile, false);
+
+
+
+            if(myFile == null)
+                return -1;
+
+            //else if(i == 15)
+                //    return 0;         //list full
+            for (i = 0; i<16; i++) {
+
+                if (myFileList[i] == null){
+                        myFileList[i] = myFile;
+                        return i;
+                }
+            }
+            return -1;
+
+    }
 private int handleWrite(int i, int addr, int size){
         //OpenFile myfile = myFileList[i];
         OpenFile writable = myFileList[i];
