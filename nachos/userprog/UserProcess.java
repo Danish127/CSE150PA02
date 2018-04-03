@@ -431,69 +431,60 @@ public class UserProcess {
         	
         
 	}
-
-    	private int handleRead(int i, int addr, int size){
-    		
-		OpenFile myfile = myFileList[i];
-		if(i < 0 || i > 15 || size < 0 || size > maxSize || myfile == null) {
-    		return -1;
-    	}
-		int numBytesWrited = 0;
-        	while(size > 0){
-		    byte[] buffer = new byte[Math.min(size, maxSize)];
-		    size -=buffer.length;
-		    int numBytesRead = myfile.read(buffer, 0 , buffer.length);
-            	    if(numBytesRead < 0 ) {
-            	    	return -1;
-            	    }
-            	    else{
-	                	int numBytesNewlyWrited = writeVirtualMemory(addr, buffer, 0, numBytesRead);
-	                	if(numBytesNewlyWrited < numBytesRead) {
-	                    	return -1;
-	                	}
-				        numBytesWrited += numBytesRead;
-				        addr += numBytesRead;
-				        if(numBytesRead < buffer.length)
-			            break;
-            	   }
-        	}
-		return numBytesWrited;
-	}
-
-    private int handleWrite(int i, int addr, int size){
-    	//OpenFile myfile = myFileList[i];
-    	OpenFile writable = myFileList[i];
-    	if(i < 0 || i > 15 || size < 0 || size > maxSize || writable == null) {
-    		return -1;
-    	}
-    	
-
-    	byte[] author = new byte[size];
-    	int tmpLength = readVirtualMemory(addr, author, 0, size);
-        int numBytesWrited = writable.write(author, 0, tmpLength);
-        
-        if(numBytesWrited == -1) {
-        	return -1;
+private int handleWrite(int i, int addr, int size){
+        //OpenFile myfile = myFileList[i];
+        OpenFile writable = myFileList[i];
+        if(i < 0 || i > 15 || size < 0 || size > maxSize || writable == null) {
+            return -1;
         }
-        return numBytesWrited;
-        /*
-        while(size > 0){
-            byte[] buffer = new byte[Math.min(size, maxSize)];
-            size -=buffer.length;
-            int numBytesRead = readVirtualMemory(addr, buffer);
-            if(numBytesRead < buffer.length )
-                return -1;
-            else{
-                int numBytesNewlyWrited = writeVirtualMemory(addr, buffer, 0, buffer.length);        //locked maybe //change buffer to addr?
-                
-                numBytesWrited += numBytesRead;
-                addr += numBytesRead;
-                if(numBytesNewlyWrited < numBytesRead)
-                    break;
-            }
-        }return numBytesWrited;*/
-   }
+        if(size == 0)
+            return 0;
 
+
+        byte[] author = new byte[size];
+        int tmpLength = readVirtualMemory(addr, author, 0, size);
+
+        if(tmpLength != size)
+            return -1;
+
+        int numBytesWrited = writable.write(author, 0, tmpLength);
+
+        if(numBytesWrited == -1|| numBytesWrited != size) {
+            return -1;
+        }
+        return numBytesWrited; }
+
+
+
+private int handleRead(int i, int addr, int size){
+
+            OpenFile myfile = myFileList[i];
+
+            if(i < 0 || i > 15 || size < 0 || size > maxSize || myfile == null) {
+                return -1;
+            }
+
+            if (size == 0)
+                return 0;
+            if(pageTable[Processor.pageFromAddress(addr)].readOnly) {
+                return -1;
+            }
+            // pagetable is read only  return -1
+
+            //int numBytesWrited = 0;
+            byte[] buffer = new byte[size];
+            size -=buffer.length;
+            int numBytesRead = myfile.read(buffer, 0 , size);
+                    if(numBytesRead < 0 ) {
+                        return -1;
+                    }
+            int numBytesNewlyWrited = writeVirtualMemory(addr, buffer, 0, numBytesRead);
+            if( numBytesNewlyWrited != numBytesRead)
+                return -1;
+            return numBytesNewlyWrited;
+
+
+        }
    private int handleClose(int i){
         if(myFileList[i] == null)
             return -1;
