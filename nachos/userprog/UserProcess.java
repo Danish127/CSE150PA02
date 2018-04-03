@@ -433,8 +433,11 @@ public class UserProcess {
 	}
 
     	private int handleRead(int i, int addr, int size){
-
+    		
 		OpenFile myfile = myFileList[i];
+		if(i < 0 || i > 15 || size < 0 || size > maxSize || myfile == null) {
+    		return -1;
+    	}
 		int numBytesWrited = 0;
         	while(size > 0){
 		    byte[] buffer = new byte[Math.min(size, maxSize)];
@@ -459,7 +462,21 @@ public class UserProcess {
 
     private int handleWrite(int i, int addr, int size){
     	//OpenFile myfile = myFileList[i];
-        int numBytesWrited = 0;
+    	OpenFile writable = myFileList[i];
+    	if(i < 0 || i > 15 || size < 0 || size > maxSize || writable == null) {
+    		return -1;
+    	}
+    	
+
+    	byte[] author = new byte[size];
+    	int tmpLength = readVirtualMemory(addr, author, 0, size);
+        int numBytesWrited = writable.write(author, 0, tmpLength);
+        
+        if(numBytesWrited == -1) {
+        	return -1;
+        }
+        return numBytesWrited;
+        /*
         while(size > 0){
             byte[] buffer = new byte[Math.min(size, maxSize)];
             size -=buffer.length;
@@ -474,7 +491,7 @@ public class UserProcess {
                 if(numBytesNewlyWrited < numBytesRead)
                     break;
             }
-        }return numBytesWrited;
+        }return numBytesWrited;*/
    }
 
    private int handleClose(int i){
