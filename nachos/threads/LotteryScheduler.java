@@ -33,6 +33,9 @@ public class LotteryScheduler extends PriorityScheduler {
     public LotteryScheduler() {
     }
     
+	public static final int priorityMaximum = Integer.MAX_VALUE;
+
+
     /**
      * Allocate a new lottery thread queue.
      *
@@ -43,7 +46,13 @@ public class LotteryScheduler extends PriorityScheduler {
      */
     public ThreadQueue newThreadQueue(boolean transferPriority) {
 	// implement me
-	return new PriorityQueue(transferPriority);
+	return new LotteryQueue(transferPriority);
+    }
+	protected ThreadState getThreadState(KThread thread) {
+        if (thread.schedulingState == null)
+            thread.schedulingState = new LotteryState(thread);
+
+        return (ThreadState) thread.schedulingState;
     }
     protected class LotteryQueue extends PriorityQueue {
 
@@ -52,6 +61,9 @@ public class LotteryScheduler extends PriorityScheduler {
 	}
 
 	public ThreadState pickNextThread() {  //returns next theard, chosen by lottery
+		if(threadWait.isEmpty()){
+			return null;
+		}
             int nextPriority = priorityMinimum;
             int total  = getEffectivePriority(); //gets the total number of tickets in the queue
     	    int target = Lib.random(total); //generates random target, between 0 and total
