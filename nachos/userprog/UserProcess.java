@@ -394,7 +394,7 @@ public class UserProcess {
             if(myFile == null)
                 return -1;
 
-            for (i = 0; i<16; i++) {
+            for (int i = 0; i<16; i++) {
 
                 if (myFileList[i]== null){
                         myFileList[i] = myFile;
@@ -427,7 +427,7 @@ private int handleOpen(int addr){  // create = 1 if file is created, else 0
 
             //else if(i == 15)
                 //    return 0;         //list full
-            for (i = 0; i<16; i++) {
+            for (int i = 0; i<16; i++) {
 
                 if (myFileList[i] == null){
                         myFileList[i] = myFile;
@@ -641,6 +641,6 @@ private int handleRead(int i, int addr, int size){
     OpenFile stdout;
     
     
-    int i;
+    //int i;
     int maxSize = 256;
 }
