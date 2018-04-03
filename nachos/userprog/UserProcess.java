@@ -473,7 +473,7 @@ private int handleRead(int i, int addr, int size){
 
             //int numBytesWrited = 0;
             byte[] buffer = new byte[size];
-            size -=buffer.length;
+            //size -=buffer.length;
             int numBytesRead = myfile.read(buffer, 0 , size);
                     if(numBytesRead < 0 ) {
                         return -1;
