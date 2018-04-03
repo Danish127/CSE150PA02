@@ -439,12 +439,18 @@ private int handleOpen(int addr){  // create = 1 if file is created, else 0
     }
 private int handleWrite(int i, int addr, int size){
         //OpenFile myfile = myFileList[i];
-        OpenFile writable = myFileList[i];
-        if(i < 0 || i > 15 || size < 0 || size > maxSize || writable == null) {
+	if(size == 0)
+            return 0;
+        
+        if(i < 0 || i > 15 || size < 0 || size > maxSize) {
             return -1;
         }
-        if(size == 0)
-            return 0;
+	
+	OpenFile writable = myFileList[i];
+	if( writable == null){
+		return -1;
+	}
+        
 
 
         byte[] author = new byte[size];
@@ -453,25 +459,29 @@ private int handleWrite(int i, int addr, int size){
         if(tmpLength != size)
             return -1;
 
-        int numBytesWrited = writable.write(author, 0, tmpLength);
+        int numBytesWriten = writable.write(author, 0, tmpLength);
 
-        if(numBytesWrited == -1|| numBytesWrited != size) {
+        if(numBytesWriten == -1|| numBytesWriten != size) {
             return -1;
         }
-        return numBytesWrited; }
+        return numBytesWriten; }
 
 
 
 private int handleRead(int i, int addr, int size){
 
-            OpenFile myfile = myFileList[i];
-
-            if(i < 0 || i > 15 || size < 0 || size > maxSize || myfile == null) {
-                return -1;
-            }
-
+            
+	
             if (size == 0)
                 return 0;
+
+            if(i < 0 || i > 15 || size < 0 || size > maxSize) {
+                return -1;
+            }
+	OpenFile myfile = myFileList[i];
+	if(myfile == null){
+		return -1;
+	}
             if(pageTable[Processor.pageFromAddress(addr)].readOnly) {
                 return -1;
             }
