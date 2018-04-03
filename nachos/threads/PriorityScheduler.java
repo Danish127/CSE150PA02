@@ -135,6 +135,7 @@ public class PriorityScheduler extends Scheduler {
             final ThreadState state = getThreadState(thread);
             this.threadWait.add(state);
             state.waitForAccess(this);
+            invalidateCachedPriority();
         }
 
         public void acquire(KThread thread) {
@@ -160,6 +161,7 @@ public class PriorityScheduler extends Scheduler {
 
             
             this.acquire(NextT.getThread()); // resource is given to 
+            invalidateCachedPriority();
 
             return NextT.getThread();		
         }
@@ -226,7 +228,7 @@ public class PriorityScheduler extends Scheduler {
      
         protected int effPriority = priorityMinimum; // seeting effective Pri to pri min
         
-        protected boolean priChange = false; // True if the effective priority of this queue has been invalidated.
+        protected boolean priChange = true; // True if the effective priority of this queue has been invalidated.
         /**
          * <tt>true</tt> if this queue should transfer priority from waiting
          * threads to the owning thread.
@@ -370,7 +372,7 @@ public class PriorityScheduler extends Scheduler {
 
         protected int effPriority = priorityMinimum; //Holds the effective priority of this Thread State.
 
-        protected boolean priChange = false; // True if the effective priority of this queue has been invalidated.
+        protected boolean priChange = true; // True if the effective priority of this queue has been invalidated.
         
         
       
