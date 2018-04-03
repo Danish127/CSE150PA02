@@ -414,7 +414,7 @@ private int handleOpen(int addr){  // create = 1 if file is created, else 0
                 return -1;    //return -1 instead of throwing exceptions
             }
             String name = readVirtualMemoryString(addr, 256);  //name = filename 
-            if(name.length() < 0)
+            if(name == null)
                     return -1;
 
             OpenFile myFile = Machine.stubFileSystem().open(name, false);
