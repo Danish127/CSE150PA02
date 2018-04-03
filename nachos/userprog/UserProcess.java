@@ -492,8 +492,13 @@ private int handleRead(int i, int addr, int size){
 
         }
    private int handleClose(int i){
-        if(myFileList[i] == null)
+	   if(i < 0 || i > 15){
+		   return -1;
+	   }
+        if(myFileList[i] == null){
+		
             return -1;
+	}
         
         myFileList[i].close();
         myFileList[i] = null;
