@@ -23,6 +23,19 @@ public class UserKernel extends ThreadedKernel {
 	super.initialize(args);
 
 	console = new SynchConsole(Machine.console());
+
+	ListLock = new Lock();
+//	PhysPageSem = new Semaphore(1);
+	int TotalPages = Machine.processor().getNumPhysPages();
+	
+	
+//	while (numPages < TotalPages) {
+//		AvailablePages.add(numPages);
+//		numPages++;
+//	}
+	for(int i = 0; i < TotalPages; i++) {
+		AvailablePages.add(i);
+	}
 	
 	Machine.processor().setExceptionHandler(new Runnable() {
 		public void run() { exceptionHandler(); }
@@ -112,4 +125,8 @@ public class UserKernel extends ThreadedKernel {
 
     // dummy variables to make javac smarter
     private static Coff dummy1 = null;
+
+	
+    public static Lock ListLock;
+    public static LinkedList <Integer> AvailablePages = new LinkedList <Integer>();
 }

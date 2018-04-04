@@ -136,18 +136,33 @@ public class UserProcess {
      */
     public int readVirtualMemory(int vaddr, byte[] data, int offset,
 				 int length) {
-	Lib.assertTrue(offset >= 0 && length >= 0 && offset+length <= data.length);
-
 	byte[] memory = Machine.processor().getMemory();
+
+	if(data == null || offset < 0 || length < 0 || (offset+length) < data.length || vaddr < 0 || vaddr >= memory.length) {
+		return 0;
+	}
 	
-	// for now, just assume that virtual addresses equal physical addresses
-	if (vaddr < 0 || vaddr >= memory.length)
-	    return 0;
+	int ByteIndex = 0;
 
-	int amount = Math.min(length, memory.length-vaddr);
-	System.arraycopy(memory, vaddr, data, offset, amount);
-
-	return amount;
+	
+	
+	while (ByteIndex < length) {
+		
+		int vpn = Machine.processor().pageFromAddress(vaddr + ByteIndex);
+		TranslationEntry entry = pageTable[vpn];
+		entry.used = true;
+		
+		int voffset = Machine.processor().offsetFromAddress(vaddr + ByteIndex);
+		
+		int paddr = Machine.processor().makeAddress(entry.ppn , voffset);
+		if (paddr < 0 || paddr >= memory.length || !entry.valid) {
+			return 0;
+		}
+		System.arraycopy(memory, paddr, data, offset + ByteIndex, 1);
+		ByteIndex++;
+		
+	}
+	return ByteIndex;
     }
 
     /**
@@ -179,18 +194,32 @@ public class UserProcess {
      */
     public int writeVirtualMemory(int vaddr, byte[] data, int offset,
 				  int length) {
-	Lib.assertTrue(offset >= 0 && length >= 0 && offset+length <= data.length);
-
+	
+	int ByteIndex = 0;
+	
 	byte[] memory = Machine.processor().getMemory();
 	
-	// for now, just assume that virtual addresses equal physical addresses
-	if (vaddr < 0 || vaddr >= memory.length)
-	    return 0;
-
-	int amount = Math.min(length, memory.length-vaddr);
-	System.arraycopy(data, offset, memory, vaddr, amount);
-
-	return amount;
+	if(data == null || offset < 0 || length < 0 || (offset+length) < data.length || vaddr < 0 || vaddr >= memory.length) {
+		return 0;
+	}
+	
+	
+	while (ByteIndex < length) {
+		int vpn = Machine.processor().pageFromAddress(vaddr + ByteIndex);
+		TranslationEntry entry = pageTable[vpn];
+		entry.used = true;
+		
+		int voffset = Machine.processor().offsetFromAddress(vaddr + ByteIndex);
+		
+		int paddr = Machine.processor().makeAddress(entry.ppn , voffset);
+		if(paddr < 0 || paddr >= memory.length || !entry.valid || entry.readOnly) {
+			return 0;
+		}
+		System.arraycopy(data, offset + ByteIndex, memory, paddr, 1);
+		ByteIndex++;
+		
+	}
+	return ByteIndex;
     }
 
     /**
@@ -289,13 +318,18 @@ public class UserProcess {
      * @return	<tt>true</tt> if the sections were successfully loaded.
      */
     protected boolean loadSections() {
-	if (numPages > Machine.processor().getNumPhysPages()) {
+	if (numPages > UserKernel.AvailablePages.size()) {
 	    coff.close();
 	    Lib.debug(dbgProcess, "\tinsufficient physical memory");
 	    return false;
 	}
+	
+	pageTable = new TranslationEntry[numPages];
+	//for (int i=0; i<numPages; i++)
+	  //  pageTable[i] = new TranslationEntry(i,-1, false,false,false,false);
 
-	// load sections
+	
+	// load sections 
 	for (int s=0; s<coff.getNumSections(); s++) {
 	    CoffSection section = coff.getSection(s);
 	    
@@ -304,10 +338,39 @@ public class UserProcess {
 
 	    for (int i=0; i<section.getLength(); i++) {
 		int vpn = section.getFirstVPN()+i;
+		
+		UserKernel.ListLock.acquire();
+		
+		int Newppn = 0;
+		Newppn = UserKernel.AvailablePages.removeFirst();
 
+		UserKernel.ListLock.release();
+			
+		
 		// for now, just assume virtual addresses=physical addresses
-		section.loadPage(i, vpn);
+		Lib.assertTrue(pageTable[vpn] == null);
+		pageTable[vpn] = new TranslationEntry(vpn, Newppn, true, section.isReadOnly(), false, false);
+//		entry.ppn = Newppn;
+//		entry.valid = true;
+//		entry.readOnly = section.isReadOnly();
+		section.loadPage(i, pageTable[vpn].ppn);
 	    }
+	}
+	
+	for (int i = numPages-9; i < numPages; i++) {
+		
+		UserKernel.ListLock.acquire();
+		int Newppn = 0;
+		
+		Newppn = UserKernel.AvailablePages.removeFirst();
+		UserKernel.ListLock.release();
+	
+		Lib.assertTrue(pageTable[i] == null);
+		pageTable[i] = new TranslationEntry(i, Newppn, true, false, false, false);
+
+//		UserKernel.PhysPageSem.V();
+//		entry.ppn = PageNum;
+//		entry.valid = true;
 	}
 	
 	return true;
@@ -317,6 +380,13 @@ public class UserProcess {
      * Release any resources allocated by <tt>loadSections()</tt>.
      */
     protected void unloadSections() {
+	for (int i = 0; i < pageTable.length; i++) {
+    		if(pageTable[i].valid) {
+    			UserKernel.ListLock.acquire();
+    			UserKernel.AvailablePages.add(pageTable[i].ppn);
+    			UserKernel.ListLock.release();
+    		}
+    	}
     }    
 
     /**
