@@ -6,6 +6,8 @@ import nachos.userprog.*;
 
 
 import java.io.EOFException;
+import java.util.HashSet;
+import java.util.Hashtable;
 
 /**
  * Encapsulates the state of a user process that is not contained in its
@@ -34,6 +36,20 @@ public class UserProcess {
 	stdout = UserKernel.console.openForWriting();
 	myFileList[0] = stdin;		//first two are stin/stdout as states in syscall.h
 	myFileList[1] = stdout;
+
+	UserKernel.processIDMutex.P();
+//		if(this == UserKernel.root) {
+//			this.pID = 0;
+//		}
+//		else {
+//			this.pID = ++UserKernel.processID;
+//		}
+		this.pID = UserKernel.processID++;
+		UserKernel.processIDMutex.V();
+		statusLock = new Lock();
+		joinCond = new Condition(statusLock);
+		exitStatus = null;
+
     }
     
     /**
@@ -416,10 +432,26 @@ public class UserProcess {
      */
     private int handleHalt() {
 
-	Machine.halt();
+	/*Machine.halt();
 	
 	Lib.assertNotReached("Machine.halt() did not halt machine!");
-	return 0;
+	return 0;*/
+	//Part III!!!!
+		if (this != UserKernel.root)
+			return 0;
+		
+		//need this chunk?
+		unloadSections();
+		for (int i = 2; i < myFileList.length; i++) {
+		    if (myFileList[i] != null)
+			myFileList[i].close();
+		}
+		
+		Machine.halt();
+
+		Lib.assertNotReached("Machine.halt() did not halt machine!");
+return 0;
+
     }
     private int handleExit(int status){
     	/**
@@ -442,7 +474,7 @@ public class UserProcess {
     join(getParent(processId));  //join the current process into the parent
 
 		 */
-		Node<UserProcess> local = getProcessFromPID(processId, UserKernel.processes);
+		/*Node<UserProcess> local = getProcessFromPID(processId, UserKernel.processes);
 		if(local.getChildren().size() > 0){
 			for(int i = 0; i < local.getChildren().size(); i++){
 				local.getChildren().get(i).getData().status = status;
@@ -453,7 +485,7 @@ public class UserProcess {
         }*/
 
 		//close all the opened files
-		for (int i=0; i<16; i++) {              
+		/*for (int i=0; i<16; i++) {              
 			handleClose(i);
 			//handleClose();
 		}
@@ -471,7 +503,45 @@ public class UserProcess {
 		}
 
 		return 1;
-		//Daniel and Prab
+		//Daniel and Prab*/
+	//load the "program" to insert into the child process hither
+		unloadSections();
+		for (int i = 2; i < fileDescriptor.length; i++) {
+		    if (fileDescriptor[i] != null)
+			fileDescriptor[i].close();
+		}
+		
+		// TODO: Still need to return status to parent somehow or set parent pointer to none
+		statusLock.acquire();
+		exitStatus = status;
+		statusLock.release();
+		
+		// Synchronize so parent cannot become null after the check
+		parentMutex.P();
+		if (parent != null)
+		{
+			parent.statusLock.acquire();
+			parent.joinCond.wakeAll();
+			parent.statusLock.release();
+
+		}
+		parentMutex.V();
+		
+		// Set each of the children's parent reference to null to meet the condition
+		// "Any children of the process no longer have a parent process"
+		for (UserProcess aChild : children.values())
+		{
+			aChild.parentMutex.P();
+			aChild.parent = null;
+			aChild.parentMutex.V();
+		}
+		
+		// Handles calling terminate when this is the last process
+		decProcessCount();
+		
+		
+		UThread.finish();
+return status;
     }
     private int handleExec(int name, int argc, int argv){
     	/**
@@ -516,7 +586,7 @@ public class UserProcess {
 		 * 
 		 */
 
-		if(name < 0 || argc < 0 || argv < 0){
+		/*if(name < 0 || argc < 0 || argv < 0){
 			return -1;
 		}
 		String file = readVirtualMemoryString(name, 256);
@@ -561,6 +631,61 @@ public class UserProcess {
 			map.put(child.process_id, newProcessData);
 			return child.process_id;
 		}*/
+//load the "program" to insert into the child process hither
+		String filename = null;
+		filename = readVirtualMemoryString(name,256);
+		
+		//Check arguments first
+		if(filename == null)
+		{
+			Lib.debug(dbgProcess, "\thandleExec: Could not read filename from Virtual Memory");
+			return -1;
+		}
+		if (argc < 0) {
+			Lib.debug(dbgProcess, "\thandleExec: argc < 0");
+			return -1;
+		}
+		
+		//Create string array to represent the "args"
+		String[] args = new String[argc];
+		
+		//The buffer to read virtual memory into
+		byte[] buffer = new byte[4];
+
+		//allocating program arguments to args[]
+		for (int i = 0; i < argc; i++) 
+		{
+			Lib.assertTrue(readVirtualMemory(argv+i*4, buffer) == buffer.length);
+            
+			args[i] = readVirtualMemoryString(Lib.bytesToInt(buffer, 0),256);
+			
+			//fail
+			if (args[i] == null)
+			{
+				Lib.debug(dbgProcess, "\thandleExec: Error reading arg "
+						+ i + " from virtual memory");
+				return -1;
+			}
+		}
+		
+		//Create new child user process
+		UserProcess child = newUserProcess();
+		
+		//Keep track of parent's children
+		children.put(child.pID, child);
+		
+		//Child keeps track of it's parent
+		child.parent = this;
+		
+		//loading program into child
+		boolean insertProgram = child.execute(filename, args);
+		
+		//successful loading returns child pID to the parent process
+		if(insertProgram) {
+			return child.pID;
+		}
+		
+return -1;
 
 
 		return -1;
@@ -570,7 +695,49 @@ public class UserProcess {
     	
     }
     private int handleJoin(int pid, int status){
-    	return 1;
+	if(!children.containsKey(processID)) {
+			Lib.debug(dbgProcess, "\thandleJoin: Attempting to join a non-child process or"
+					+ " this is child this parent has already joined");
+			return -1;
+		}
+		
+		UserProcess child = children.get(processID);
+		
+		// Acquire child's lock so we can look at it
+		child.statusLock.acquire();
+		
+		// Lock should appropriately handle synchronization of child's status
+		Integer childStatus = child.exitStatus;
+
+
+		if (childStatus == null)
+		{
+			statusLock.acquire();
+			child.statusLock.release();
+			joinCond.sleep();
+			statusLock.release();
+			
+			child.statusLock.acquire();
+			// Status better be in the table now
+			childStatus = child.exitStatus;
+
+		}
+		child.statusLock.release();
+//		Lib.assertTrue(childStatus != null);
+		
+		// Child should no longer be joinable as in syscall.h
+		children.remove(processID);
+		
+			
+		// Write the status to the memory address given
+		byte[] statusAry = Lib.bytesFromInt(childStatus.intValue());
+		writeVirtualMemory(status, statusAry);
+		
+		if (childStatus.intValue() == 0)
+			return 1;
+		else
+			return 0;
+    	//return 1;
     	//Daniel and Prab
 	
     }
@@ -741,6 +908,30 @@ private int handleRead(int i, int addr, int size){
  
     }
 
+	private static Integer generateUniquePID(){
+		Integer tmpId = rando.nextInt();
+		//processIds.addChild();
+		for(int i = 0; i < UserKernel.processes.getChildren().size(); i++){
+			while(UserKernel.processes.getChildren().get(i).getData().processId == tmpId || tmpId <= 0){
+				tmpId = rando.nextInt();
+			}
+		}
+		return tmpId;
+	}
+
+	private static Node<UserProcess> getProcessFromPID(Integer PID, Node<UserProcess> start){
+		for(int i = 0; i < start.getChildren().size(); i++){
+			if(start.getChildren().get(i).getChildren().size() > 0){
+				return getProcessFromPID(PID, start.getChildren().get(i));
+			}else{
+				if(start.getChildren().get(i).getData().processId == PID){
+					return start.getChildren().get(i);
+				}
+			}
+		}
+		return null;
+	}
+
 
     private static final int
         syscallHalt = 0,
@@ -865,4 +1056,17 @@ private int handleRead(int i, int addr, int size){
     
     //int i;
     int maxSize = 256;
+
+
+	protected int pID;
+	
+	protected Semaphore parentMutex = new Semaphore(1);
+protected UserProcess parent;
+	protected Hashtable<Integer,UserProcess> children = new Hashtable<Integer, UserProcess>();
+	
+	protected Integer exitStatus;
+	
+	// Used to join a child
+	protected Lock statusLock;
+	protected Condition joinCond;
 }

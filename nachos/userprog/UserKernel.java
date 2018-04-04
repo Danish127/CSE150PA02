@@ -3,6 +3,7 @@ package nachos.userprog;
 import nachos.machine.*;
 import nachos.threads.*;
 import nachos.userprog.*;
+import java.util.LinkedList;
 
 /**
  * A kernel that can support multiple user processes.
@@ -129,4 +130,16 @@ public class UserKernel extends ThreadedKernel {
 	public static Lock ListLock;
     public static LinkedList <Integer> AvailablePages = new LinkedList <Integer>();
 	public static Node<UserProcess> processes = new Node<UserProcess>(null);
+
+	public static Semaphore physPageMutex;
+	
+	public static Semaphore processIDMutex;
+	
+	public static int processID;
+	
+	public static int processCount;
+	public static Semaphore pCountMutex;
+	
+	//References the root process
+public static UserProcess root = null;
 }
