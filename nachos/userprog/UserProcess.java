@@ -136,18 +136,33 @@ public class UserProcess {
      */
     public int readVirtualMemory(int vaddr, byte[] data, int offset,
 				 int length) {
-	Lib.assertTrue(offset >= 0 && length >= 0 && offset+length <= data.length);
-
 	byte[] memory = Machine.processor().getMemory();
+
+	if(data == null || offset < 0 || length < 0 || (offset+length) < data.length || vaddr < 0 || vaddr >= memory.length) {
+		return 0;
+	}
 	
-	// for now, just assume that virtual addresses equal physical addresses
-	if (vaddr < 0 || vaddr >= memory.length)
-	    return 0;
+	int ByteIndex = 0;
 
-	int amount = Math.min(length, memory.length-vaddr);
-	System.arraycopy(memory, vaddr, data, offset, amount);
-
-	return amount;
+	
+	
+	while (ByteIndex < length) {
+		
+		int vpn = Machine.processor().pageFromAddress(vaddr + ByteIndex);
+		TranslationEntry entry = pageTable[vpn];
+		entry.used = true;
+		
+		int voffset = Machine.processor().offsetFromAddress(vaddr + ByteIndex);
+		
+		int paddr = Machine.processor().makeAddress(entry.ppn , voffset);
+		if (paddr < 0 || paddr >= memory.length || !entry.valid) {
+			return 0;
+		}
+		System.arraycopy(memory, paddr, data, offset + ByteIndex, 1);
+		ByteIndex++;
+		
+	}
+	return ByteIndex;
     }
 
     /**
@@ -179,18 +194,31 @@ public class UserProcess {
      */
     public int writeVirtualMemory(int vaddr, byte[] data, int offset,
 				  int length) {
-	Lib.assertTrue(offset >= 0 && length >= 0 && offset+length <= data.length);
-
+	int ByteIndex = 0;
+	
 	byte[] memory = Machine.processor().getMemory();
 	
-	// for now, just assume that virtual addresses equal physical addresses
-	if (vaddr < 0 || vaddr >= memory.length)
-	    return 0;
-
-	int amount = Math.min(length, memory.length-vaddr);
-	System.arraycopy(data, offset, memory, vaddr, amount);
-
-	return amount;
+	if(data == null || offset < 0 || length < 0 || (offset+length) < data.length || vaddr < 0 || vaddr >= memory.length) {
+		return 0;
+	}
+	
+	
+	while (ByteIndex < length) {
+		int vpn = Machine.processor().pageFromAddress(vaddr + ByteIndex);
+		TranslationEntry entry = pageTable[vpn];
+		entry.used = true;
+		
+		int voffset = Machine.processor().offsetFromAddress(vaddr + ByteIndex);
+		
+		int paddr = Machine.processor().makeAddress(entry.ppn , voffset);
+		if(paddr < 0 || paddr >= memory.length || !entry.valid || entry.readOnly) {
+			return 0;
+		}
+		System.arraycopy(data, offset + ByteIndex, memory, paddr, 1);
+		ByteIndex++;
+		
+	}
+	return ByteIndex;
     }
 
     /**
@@ -289,13 +317,18 @@ public class UserProcess {
      * @return	<tt>true</tt> if the sections were successfully loaded.
      */
     protected boolean loadSections() {
-	if (numPages > Machine.processor().getNumPhysPages()) {
+	if (numPages > UserKernel.AvailablePages.size()) {
 	    coff.close();
 	    Lib.debug(dbgProcess, "\tinsufficient physical memory");
 	    return false;
 	}
+	
+	pageTable = new TranslationEntry[numPages];
+	//for (int i=0; i<numPages; i++)
+	  //  pageTable[i] = new TranslationEntry(i,-1, false,false,false,false);
 
-	// load sections
+	
+	// load sections 
 	for (int s=0; s<coff.getNumSections(); s++) {
 	    CoffSection section = coff.getSection(s);
 	    
@@ -304,10 +337,39 @@ public class UserProcess {
 
 	    for (int i=0; i<section.getLength(); i++) {
 		int vpn = section.getFirstVPN()+i;
+		
+		UserKernel.ListLock.acquire();
+		
+		int Newppn = 0;
+		Newppn = UserKernel.AvailablePages.removeFirst();
 
+		UserKernel.ListLock.release();
+			
+		
 		// for now, just assume virtual addresses=physical addresses
-		section.loadPage(i, vpn);
+		Lib.assertTrue(pageTable[vpn] == null);
+		pageTable[vpn] = new TranslationEntry(vpn, Newppn, true, section.isReadOnly(), false, false);
+//		entry.ppn = Newppn;
+//		entry.valid = true;
+//		entry.readOnly = section.isReadOnly();
+		section.loadPage(i, pageTable[vpn].ppn);
 	    }
+	}
+	
+	for (int i = numPages-9; i < numPages; i++) {
+		
+		UserKernel.ListLock.acquire();
+		int Newppn = 0;
+		
+		Newppn = UserKernel.AvailablePages.removeFirst();
+		UserKernel.ListLock.release();
+	
+		Lib.assertTrue(pageTable[i] == null);
+		pageTable[i] = new TranslationEntry(i, Newppn, true, false, false, false);
+
+//		UserKernel.PhysPageSem.V();
+//		entry.ppn = PageNum;
+//		entry.valid = true;
 	}
 	
 	return true;
@@ -317,6 +379,13 @@ public class UserProcess {
      * Release any resources allocated by <tt>loadSections()</tt>.
      */
     protected void unloadSections() {
+	for (int i = 0; i < pageTable.length; i++) {
+    		if(pageTable[i].valid) {
+    			UserKernel.ListLock.acquire();
+    			UserKernel.AvailablePages.add(pageTable[i].ppn);
+    			UserKernel.ListLock.release();
+    		}
+    	}
     }    
 
     /**
@@ -352,16 +421,155 @@ public class UserProcess {
 	Lib.assertNotReached("Machine.halt() did not halt machine!");
 	return 0;
     }
-    private int handleExit(){
-    	return 1;
-    	//Daniel and Prab
+    private int handleExit(int status){
+    	/**
+		 * Terminate the current process immediately. Any open file descriptors
+		 * belonging to the process are closed. Any children of the process no longer
+		 * have a parent process.
+		 *
+		 * status is returned to the parent process as this process's exit status and
+		 * can be collected using the join syscall. A process exiting normally should
+		 * (but is not required to) set status to 0.
+		 *
+		 * exit() never returns.
+		 */
+		/*
+		 * 
+		 * foreach(child : getChildren(processId)){  //for each child, shutdown the child
+        exit(child);  //shutdown the child
     }
-    private int handleExec(){
-    	return 1;
-    	//Daniel and Prab
+    getParent(processId).returnCode = 0;  //return the return code to the parent
+    join(getParent(processId));  //join the current process into the parent
+
+		 */
+		Node<UserProcess> local = getProcessFromPID(processId, UserKernel.processes);
+		if(local.getChildren().size() > 0){
+			for(int i = 0; i < local.getChildren().size(); i++){
+				local.getChildren().get(i).getData().status = status;
+			}
+		}
+		/*if(myChildProcess!=null){
+        	myChildProcess.status = status;
+        }*/
+
+		//close all the opened files
+		for (int i=0; i<16; i++) {              
+			handleClose(i);
+			//handleClose();
+		}
+
+		//part2 implemented
+		this.unloadSections();
+
+		//local.
+		if(UserKernel.processes.getChildren().contains(local)){
+		//if(this.process_id==ROOT){
+			Kernel.kernel.terminate();
+		} else {
+			KThread.finish();
+			Lib.assertNotReached();
+		}
+
+		return 1;
+		//Daniel and Prab
+    }
+    private int handleExec(int name, int argc, int argv){
+    	/**
+		 * Execute the program stored in the specified file, with the specified
+		 * arguments, in a new child process. The child process has a new unique
+		 * process ID, and starts with stdin opened as file descriptor 0, and stdout
+		 * opened as file descriptor 1.
+		 *
+		 * file is a null-terminated string that specifies the name of the file
+		 * containing the executable. Note that this string must include the ".coff"
+		 * extension.
+		 *
+		 * argc specifies the number of arguments to pass to the child process. This
+		 * number must be non-negative.
+		 *
+		 * argv is an array of pointers to null-terminated strings that represent the
+		 * arguments to pass to the child process. argv[0] points to the first
+		 * argument, and argv[argc-1] points to the last argument.
+		 *
+		 * exec() returns the child process's process ID, which can be passed to
+		 * join(). On error, returns -1.
+		 */
+
+
+
+		/*
+		 * Int processId = new Random(int);  //creates a new process ID
+        	while (processId is already in use){  //check to see if the generated process ID is in use
+            processId = new Random(int);  //if in use create a new one until one’s not in use
+        }
+        Open file;  //open the file
+        Open stdin(0);  //open input stream
+        Open stdout(1);  //open output stream
+        Line line = file.getNextLine();  //Grab next line of the file
+        while(line != null){  //check to see if the line has code
+            Run line;  //run the line of code
+            line = file.getNextLine();  //get new line
+        }
+        exit(processId);  //once out of lines, shutdown the process
+		 * 
+		 * 
+		 * 
+		 */
+
+		if(name < 0 || argc < 0 || argv < 0){
+			return -1;
+		}
+		String file = readVirtualMemoryString(name, 256);
+
+		if(file == null){
+			return -1;
+		}
+
+		//edit from here on
+		String args[]= new String[argc];
+
+		int byteReceived, argAddress;
+		byte temp[]=new byte[4];
+		for(int i = 0; i < argc; i++){
+			byteReceived=readVirtualMemory(argv + i * 4, temp);
+			if(byteReceived != 4){
+				return -1;
+			}
+
+			argAddress = Lib.bytesToInt(temp, 0);
+			args[i] = readVirtualMemoryString(argAddress, 256);
+
+			if(args[i] == null){
+				return -1;
+			}
+
+		}
+		//make harder to read^
+		
+		UserProcess child = UserProcess.newUserProcess();
+		if(child.execute(file, args)){
+			self.addChild(child);
+			child.self.setParent(self);
+			return child.processId;
+		}
+		/*
+		UserProcess child = UserProcess.newUserProcess();
+		childProcess newProcessData = new childProcess(child);
+		child.myChildProcess = newProcessData;
+
+		if(child.execute(name, args)){
+			map.put(child.process_id, newProcessData);
+			return child.process_id;
+		}*/
+
+
+		return -1;
+
+		//return 1;
+		//Daniel and Prab
     	
     }
-    private int handleJoin(){
+    private int handleJoin(int pid, int status){
     	return 1;
     	//Daniel and Prab
 	
@@ -579,11 +787,11 @@ private int handleRead(int i, int addr, int size){
 	case syscallHalt:
 	    return handleHalt();
 	case syscallExit:
-		return 1;
+		return handleExit(a0);
 	case syscallExec:
-		return 2;
+		return handleExec(a0, a1, a2);
 	case syscallJoin:
-		return 3;
+		return handleJoin(a0, a1);
 	case syscallCreate:
 		return handleCreate(a0);
 	case syscallOpen:
