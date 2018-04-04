@@ -473,7 +473,7 @@ private int handleRead(int i, int addr, int size){
                 return 0;
 	    }
 
-            if(i < 0 || i > 15 || size < 0 || size > maxSize || addr < 0) {
+            if(i < 0 || i > 15 || size < 0 /*|| size > maxSize */|| addr < 0) {
                 return -1;
             }
 	OpenFile myfile = myFileList[i];
