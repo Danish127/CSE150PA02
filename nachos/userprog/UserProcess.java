@@ -442,7 +442,7 @@ private int handleWrite(int i, int addr, int size){
 	if(size == 0)
             return 0;
         
-        if(i < 0 || i > 15 || size < 0 || size > maxSize) {
+        if(i < 0 || i > 15 || size < 0 || size > maxSize || addr < 0) {
             return -1;
         }
 	
@@ -469,13 +469,11 @@ private int handleWrite(int i, int addr, int size){
 
 
 private int handleRead(int i, int addr, int size){
-
-            
-	
-            if (size == 0)
+            if (size == 0) {
                 return 0;
+	    }
 
-            if(i < 0 || i > 15 || size < 0 || size > maxSize) {
+            if(i < 0 || i > 15 || size < 0 || size > maxSize || addr < 0) {
                 return -1;
             }
 	OpenFile myfile = myFileList[i];
@@ -495,8 +493,9 @@ private int handleRead(int i, int addr, int size){
                         return -1;
                     }
             int numBytesNewlyWrited = writeVirtualMemory(addr, buffer, 0, numBytesRead);
-            if( numBytesNewlyWrited != numBytesRead)
+            if( numBytesNewlyWrited != numBytesRead) {
                 return -1;
+	    }
             return numBytesNewlyWrited;
 
 
