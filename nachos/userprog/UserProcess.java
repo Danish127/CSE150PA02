@@ -368,135 +368,146 @@ public class UserProcess {
     }
   
 	private int handleCreate(int addr){  // create = 1 if file is created, else 0
-    	//Max length is 256
-    
-   		if(addr < 0){
-        		return -1;    //return -1 instead of throwing exceptions
-    		}
-        	String name = readVirtualMemoryString(addr, 256);  //name 
-        	if(name == null) {
-            		return -1;
-        	}
-    
-        	OpenFile myFile = Machine.stubFileSystem().open(name, true);//my file created
-        	//OpenFile myfile = ThreadedKernal.fileSystem.open(myfile, true); 
-        	//original implementation
-        
-        
-        	
-        	/*for(int j = 0; j<16; j++) { //makes all indexes null each time it is called
-        		
-        		myFileList[j] = null;
-        		
-        	} */
-        	
-        	
-        	if(myFile == null)
-        		return -1;
-        	
-        	for (i = 0; i<16; i++) {
-	        	
-        		if (myFileList[i]== null){
-	            		myFileList[i] = myFile;
-	                	return i;
-	        	}
-        	}
-            return -1;         //list full
-        
-	}
-    	private int handleOpen(int addr){  // create = 1 if file is created, else 0
-    	//Max length is 256
-    
-   		if(addr < 0){
-        		return -1;    //return -1 instead of throwing exceptions
-    		}
-        	String name = readVirtualMemoryString(addr, 256);  //name = filename 
-        	if(name.length() < 0)
-            		return -1;
-    
-        	OpenFile myFile = Machine.stubFileSystem().open(name, false);
-        	//Original Implementation: OpenFile myfile = ThreadedKernal.fileSystem.open(myfile, false);
-        
-        	
-        	
-        	if(myFile == null)
-            		return -1;
-        	
-        	else if(i == 15)
-            		return 0;         //list full
-        	else{
-            		myFileList[i] = myFile; //make a for loop
-                	return i;
-        	}
-        	
-        
-	}
+        //Max length is 256
 
-    	private int handleRead(int i, int addr, int size){
-    		
-		OpenFile myfile = myFileList[i];
-		if(i < 0 || i > 15 || size < 0 || size > maxSize || myfile == null) {
-    		return -1;
-    	}
-		int numBytesWrited = 0;
-        	while(size > 0){
-		    byte[] buffer = new byte[Math.min(size, maxSize)];
-		    size -=buffer.length;
-		    int numBytesRead = myfile.read(buffer, 0 , buffer.length);
-            	    if(numBytesRead < 0 ) {
-            	    	return -1;
-            	    }
-            	    else{
-	                	int numBytesNewlyWrited = writeVirtualMemory(addr, buffer, 0, numBytesRead);
-	                	if(numBytesNewlyWrited < numBytesRead) {
-	                    	return -1;
-	                	}
-				        numBytesWrited += numBytesRead;
-				        addr += numBytesRead;
-				        if(numBytesRead < buffer.length)
-			            break;
-            	   }
-        	}
-		return numBytesWrited;
-	}
-
-    private int handleWrite(int i, int addr, int size){
-    	//OpenFile myfile = myFileList[i];
-    	OpenFile writable = myFileList[i];
-    	if(i < 0 || i > 15 || size < 0 || size > maxSize || writable == null) {
-    		return -1;
-    	}
-    	
-
-    	byte[] author = new byte[size];
-    	int tmpLength = readVirtualMemory(addr, author, 0, size);
-        int numBytesWrited = writable.write(author, 0, tmpLength);
-        
-        if(numBytesWrited == -1) {
-        	return -1;
-        }
-        return numBytesWrited;
-        /*
-        while(size > 0){
-            byte[] buffer = new byte[Math.min(size, maxSize)];
-            size -=buffer.length;
-            int numBytesRead = readVirtualMemory(addr, buffer);
-            if(numBytesRead < buffer.length )
-                return -1;
-            else{
-                int numBytesNewlyWrited = writeVirtualMemory(addr, buffer, 0, buffer.length);        //locked maybe //change buffer to addr?
-                
-                numBytesWrited += numBytesRead;
-                addr += numBytesRead;
-                if(numBytesNewlyWrited < numBytesRead)
-                    break;
+           if(addr < 0){
+                return -1;    //return -1 instead of throwing exceptions
             }
-        }return numBytesWrited;*/
-   }
+            String name = readVirtualMemoryString(addr, 256);  //name 
+            if(name == null) {
+                    return -1;
+            }
 
-   private int handleClose(int i){
-        if(myFileList[i] == null)
+            OpenFile myFile = Machine.stubFileSystem().open(name, true);//my file created
+            //OpenFile myfile = ThreadedKernal.fileSystem.open(myfile, true); 
+            //original implementation
+
+
+
+            /*for(int j = 0; j<16; j++) { //makes all indexes null each time it is called
+
+                myFileList[j] = null;
+
+            } */
+
+
+            if(myFile == null)
+                return -1;
+
+            for (int i = 0; i<16; i++) {
+
+                if (myFileList[i]== null){
+                        myFileList[i] = myFile;
+                        return i;
+                }
+            }
+            return -1;         //list full
+
+    }
+
+
+
+private int handleOpen(int addr){  // create = 1 if file is created, else 0
+        //Max length is 256
+
+           if(addr < 0){
+                return -1;    //return -1 instead of throwing exceptions
+            }
+            String name = readVirtualMemoryString(addr, 256);  //name = filename 
+            if(name == null)
+                    return -1;
+
+            OpenFile myFile = Machine.stubFileSystem().open(name, false);
+            //Original Implementation: OpenFile myfile = ThreadedKernal.fileSystem.open(myfile, false);
+
+
+
+            if(myFile == null)
+                return -1;
+
+            //else if(i == 15)
+                //    return 0;         //list full
+            for (int i = 0; i<16; i++) {
+
+                if (myFileList[i] == null){
+                        myFileList[i] = myFile;
+                        return i;
+                }
+            }
             return -1;
+
+    }
+private int handleWrite(int i, int addr, int size){
+        //OpenFile myfile = myFileList[i];
+	if(size == 0)
+            return 0;
+        
+        if(i < 0 || i > 15 || size < 0 || size > maxSize || addr < 0) {
+            return -1;
+        }
+	
+	OpenFile writable = myFileList[i];
+	if( writable == null){
+		return -1;
+	}
+        
+
+
+        byte[] author = new byte[size];
+        int tmpLength = readVirtualMemory(addr, author, 0, size);
+
+        if(tmpLength != size)
+            return -1;
+
+        int numBytesWriten = writable.write(author, 0, tmpLength);
+
+        if(numBytesWriten == -1|| numBytesWriten != size) {
+            return -1;
+        }
+        return numBytesWriten; }
+
+
+
+private int handleRead(int i, int addr, int size){
+            if (size == 0) {
+                return 0;
+	    }
+
+            if(i < 0 || i > 15 || size < 0 || size > maxSize || addr < 0) {
+                return -1;
+            }
+	OpenFile myfile = myFileList[i];
+	if(myfile == null){
+		return -1;
+	}
+            if(pageTable[Processor.pageFromAddress(addr)].readOnly) {
+                return -1;
+            }
+            // pagetable is read only  return -1
+
+            //int numBytesWrited = 0;
+            byte[] buffer = new byte[size];
+            //size -=buffer.length;
+            int numBytesRead = myfile.read(buffer, 0 , size);
+                    if(numBytesRead < 0 ) {
+                        return -1;
+                    }
+            int numBytesNewlyWrited = writeVirtualMemory(addr, buffer, 0, numBytesRead);
+            if( numBytesNewlyWrited != numBytesRead) {
+                return -1;
+	    }
+            return numBytesNewlyWrited;
+
+
+        }
+   private int handleClose(int i){
+	   if(i < 0 || i > 15){
+		   return -1;
+	   }
+        if(myFileList[i] == null){
+		
+            return -1;
+	}
         
         myFileList[i].close();
         myFileList[i] = null;
@@ -644,6 +655,6 @@ public class UserProcess {
     OpenFile stdout;
     
     
-    int i;
+    //int i;
     int maxSize = 256;
 }
