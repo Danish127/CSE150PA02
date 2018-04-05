@@ -35,20 +35,13 @@ public class UserProcess {
 		myFileList[0] = stdin; // first two are stin/stdout as states in
 								// syscall.h
 		myFileList[1] = stdout;
-
-		UserKernel.processIDMutex.P();
-		// if(this == UserKernel.root) {
-		// this.pID = 0;
-		// }
-		// else {
-		// this.pID = ++UserKernel.processID;
-		// }
-		this.pID = UserKernel.processID++;
-		UserKernel.processIDMutex.V();
+		
 		statusLock = new Lock();
-		joinCond = new Condition(statusLock);
+		UserKernel.processIDMutex.P();
+		processID = UserKernel.processID++;
+		UserKernel.processIDMutex.V();
 		exitStatus = null;
-
+		joinCondition = new Condition(statusLock);
 	}
 
 	/**
@@ -498,8 +491,6 @@ public class UserProcess {
 		 * local.getChildren().get(i).getData().status = status; } }
 		 * /*if(myChildProcess!=null){ myChildProcess.status = status; }
 		 */
-
-		// load the "program" to insert into the child process hither
 		unloadSections();
 		for (int i = 2; i < myFileList.length; i++) {
 			if (myFileList[i] != null)
@@ -507,24 +498,20 @@ public class UserProcess {
 		}
 
 		// TODO: Still need to return status to parent somehow or set parent
-		// pointer to none
 		statusLock.acquire();
 		exitStatus = status;
+		//this.parent
 		statusLock.release();
 
-		// Synchronize so parent cannot become null after the check
 		parentMutex.P();
 		if (parent != null) {
 			parent.statusLock.acquire();
-			parent.joinCond.wakeAll();
+			parent.joinCondition.wakeAll();
 			parent.statusLock.release();
 
 		}
 		parentMutex.V();
 
-		// Set each of the children's parent reference to null to meet the
-		// condition
-		// "Any children of the process no longer have a parent process"
 		for (UserProcess aChild : children.values()) {
 			aChild.parentMutex.P();
 			aChild.parent = null;
@@ -532,7 +519,7 @@ public class UserProcess {
 		}
 
 		// Handles calling terminate when this is the last process
-		decProcessCount();
+		//decProcessCount();
 
 		UThread.finish();
 		return status;
@@ -571,68 +558,42 @@ public class UserProcess {
 		 * //run the line of code line = file.getNextLine(); //get new line }
 		 * exit(processId); //once out of lines, shutdown the process
 		 */
-		// load the "program" to insert into the child process hither
-		String filename = null;
-		filename = readVirtualMemoryString(name, 256);
+		String fileName = null;
+		fileName = readVirtualMemoryString(name, 256);
 
-		// Check arguments first
-		if (filename == null) {
-			Lib.debug(dbgProcess,
-					"\thandleExec: Could not read filename from Virtual Memory");
+		if (fileName == null || argc < 0) {
 			return -1;
 		}
-		if (argc < 0) {
-			Lib.debug(dbgProcess, "\thandleExec: argc < 0");
-			return -1;
-		}
-
-		// Create string array to represent the "args"
+		
 		String[] args = new String[argc];
-
-		// The buffer to read virtual memory into
 		byte[] buffer = new byte[4];
-
-		// allocating program arguments to args[]
 		for (int i = 0; i < argc; i++) {
-			Lib.assertTrue(readVirtualMemory(argv + i * 4, buffer) == buffer.length);
-
 			args[i] = readVirtualMemoryString(Lib.bytesToInt(buffer, 0), 256);
-
-			// fail
 			if (args[i] == null) {
-				Lib.debug(dbgProcess, "\thandleExec: Error reading arg " + i
-						+ " from virtual memory");
 				return -1;
 			}
 		}
 
-		// Create new child user process
 		UserProcess child = newUserProcess();
 
 		// Keep track of parent's children
-		children.put(child.pID, child);
+		children.put(child.processID, child);
 
 		// Child keeps track of it's parent
 		child.parent = this;
 
-		// loading program into child
-		boolean insertProgram = child.execute(filename, args);
-
 		// successful loading returns child pID to the parent process
-		if (insertProgram) {
-			return child.pID;
+		if (child.execute(fileName, args)) {
+			return child.processID;
+		} else {
+			return -1;
 		}
-
-		return -1;
 		// Daniel and Prab
 
 	}
 
 	private int handleJoin(int pid, int status) {
 		if (!children.containsKey(pid)) {
-			Lib.debug(dbgProcess,
-					"\thandleJoin: Attempting to join a non-child process or"
-							+ " this is child this parent has already joined");
 			return -1;
 		}
 
@@ -645,9 +606,13 @@ public class UserProcess {
 		Integer childStatus = child.exitStatus;
 
 		if (childStatus == null) {
-			statusLock.acquire();
+			/*statusLock.acquire();
 			child.statusLock.release();
-			joinCond.sleep();
+			joinCondition.sleep();
+			statusLock.release();*/
+			child.statusLock.release();
+			statusLock.acquire();
+			joinCondition.sleep();
 			statusLock.release();
 
 			child.statusLock.acquire();
@@ -664,7 +629,6 @@ public class UserProcess {
 		// Write the status to the memory address given
 		byte[] statusAry = Lib.bytesFromInt(childStatus.intValue());
 		writeVirtualMemory(status, statusAry);
-
 		if (childStatus.intValue() == 0){
 			return 1;
 		} else {
@@ -827,6 +791,7 @@ public class UserProcess {
 
 		if (name == null)
 			return -1;
+		
 		Machine.stubFileSystem().remove(name); // remove to free up space for
 												// other files to use
 
@@ -1009,18 +974,14 @@ public class UserProcess {
 	OpenFile stdin;
 	OpenFile stdout;
 
-	// int i;
 	int maxSize = 256;
 
-	protected int pID;
-
+	protected int processID;
 	protected Semaphore parentMutex = new Semaphore(1);
 	protected UserProcess parent;
 	protected Hashtable<Integer, UserProcess> children = new Hashtable<Integer, UserProcess>();
 
 	protected Integer exitStatus;
-
-	// Used to join a child
 	protected Lock statusLock;
-	protected Condition joinCond;
+	protected Condition joinCondition;
 }
