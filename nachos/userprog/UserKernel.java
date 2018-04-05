@@ -9,137 +9,146 @@ import java.util.LinkedList;
  * A kernel that can support multiple user processes.
  */
 public class UserKernel extends ThreadedKernel {
-    /**
-     * Allocate a new user kernel.
-     */
-    public UserKernel() {
-	super();
-    }
-
-    /**
-     * Initialize this kernel. Creates a synchronized console and sets the
-     * processor's exception handler.
-     */
-    public void initialize(String[] args) {
-	super.initialize(args);
-
-	console = new SynchConsole(Machine.console());
-
-	ListLock = new Lock();
-//	PhysPageSem = new Semaphore(1);
-	int TotalPages = Machine.processor().getNumPhysPages();
-	
-	
-//	while (numPages < TotalPages) {
-//		AvailablePages.add(numPages);
-//		numPages++;
-//	}
-	for(int i = 0; i < TotalPages; i++) {
-		AvailablePages.add(i);
+	/**
+	 * Allocate a new user kernel.
+	 */
+	public UserKernel() {
+		super();
 	}
-	
-	Machine.processor().setExceptionHandler(new Runnable() {
-		public void run() { exceptionHandler(); }
-	    });
-    }
 
-    /**
-     * Test the console device.
-     */	
-    public void selfTest() {
-	super.selfTest();
+	/**
+	 * Initialize this kernel. Creates a synchronized console and sets the
+	 * processor's exception handler.
+	 */
+	public void initialize(String[] args) {
+		super.initialize(args);
 
-	System.out.println("Testing the console device. Typed characters");
-	System.out.println("will be echoed until q is typed.");
+		console = new SynchConsole(Machine.console());
 
-	char c;
+		ListLock = new Lock();
 
-	do {
-	    c = (char) console.readByte(true);
-	    console.writeByte(c);
+		processCount = 0;
+		pCountMutex = new Semaphore(1);
+
+		// Initializing physical pages
+		physPageMutex = new Semaphore(1);
+		// physicalPages = new LinkedList<Integer>();
+
+		processIDMutex = new Semaphore(1);
+		processID = 0;
+		// PhysPageSem = new Semaphore(1);
+		int TotalPages = Machine.processor().getNumPhysPages();
+
+		// while (numPages < TotalPages) {
+		// AvailablePages.add(numPages);
+		// numPages++;
+		// }
+		for (int i = 0; i < TotalPages; i++) {
+			AvailablePages.add(i);
+		}
+
+		Machine.processor().setExceptionHandler(new Runnable() {
+			public void run() {
+				exceptionHandler();
+			}
+		});
 	}
-	while (c != 'q');
 
-	System.out.println("");
-    }
+	/**
+	 * Test the console device.
+	 */
+	public void selfTest() {
+		super.selfTest();
 
-    /**
-     * Returns the current process.
-     *
-     * @return	the current process, or <tt>null</tt> if no process is current.
-     */
-    public static UserProcess currentProcess() {
-	if (!(KThread.currentThread() instanceof UThread))
-	    return null;
-	
-	return ((UThread) KThread.currentThread()).process;
-    }
+		System.out.println("Testing the console device. Typed characters");
+		System.out.println("will be echoed until q is typed.");
 
-    /**
-     * The exception handler. This handler is called by the processor whenever
-     * a user instruction causes a processor exception.
-     *
-     * <p>
-     * When the exception handler is invoked, interrupts are enabled, and the
-     * processor's cause register contains an integer identifying the cause of
-     * the exception (see the <tt>exceptionZZZ</tt> constants in the
-     * <tt>Processor</tt> class). If the exception involves a bad virtual
-     * address (e.g. page fault, TLB miss, read-only, bus error, or address
-     * error), the processor's BadVAddr register identifies the virtual address
-     * that caused the exception.
-     */
-    public void exceptionHandler() {
-	Lib.assertTrue(KThread.currentThread() instanceof UThread);
+		char c;
 
-	UserProcess process = ((UThread) KThread.currentThread()).process;
-	int cause = Machine.processor().readRegister(Processor.regCause);
-	process.handleException(cause);
-    }
+		do {
+			c = (char) console.readByte(true);
+			console.writeByte(c);
+		} while (c != 'q');
 
-    /**
-     * Start running user programs, by creating a process and running a shell
-     * program in it. The name of the shell program it must run is returned by
-     * <tt>Machine.getShellProgramName()</tt>.
-     *
-     * @see	nachos.machine.Machine#getShellProgramName
-     */
-    public void run() {
-	super.run();
+		System.out.println("");
+	}
 
-	UserProcess process = UserProcess.newUserProcess();
-	
-	String shellProgram = Machine.getShellProgramName();	
-	Lib.assertTrue(process.execute(shellProgram, new String[] { }));
+	/**
+	 * Returns the current process.
+	 * 
+	 * @return the current process, or <tt>null</tt> if no process is current.
+	 */
+	public static UserProcess currentProcess() {
+		if (!(KThread.currentThread() instanceof UThread))
+			return null;
 
-	KThread.currentThread().finish();
-    }
+		return ((UThread) KThread.currentThread()).process;
+	}
 
-    /**
-     * Terminate this kernel. Never returns.
-     */
-    public void terminate() {
-	super.terminate();
-    }
+	/**
+	 * The exception handler. This handler is called by the processor whenever a
+	 * user instruction causes a processor exception.
+	 * 
+	 * <p>
+	 * When the exception handler is invoked, interrupts are enabled, and the
+	 * processor's cause register contains an integer identifying the cause of
+	 * the exception (see the <tt>exceptionZZZ</tt> constants in the
+	 * <tt>Processor</tt> class). If the exception involves a bad virtual
+	 * address (e.g. page fault, TLB miss, read-only, bus error, or address
+	 * error), the processor's BadVAddr register identifies the virtual address
+	 * that caused the exception.
+	 */
+	public void exceptionHandler() {
+		Lib.assertTrue(KThread.currentThread() instanceof UThread);
 
-    /** Globally accessible reference to the synchronized console. */
-    public static SynchConsole console;
+		UserProcess process = ((UThread) KThread.currentThread()).process;
+		int cause = Machine.processor().readRegister(Processor.regCause);
+		process.handleException(cause);
+	}
 
-    // dummy variables to make javac smarter
-    private static Coff dummy1 = null;
+	/**
+	 * Start running user programs, by creating a process and running a shell
+	 * program in it. The name of the shell program it must run is returned by
+	 * <tt>Machine.getShellProgramName()</tt>.
+	 * 
+	 * @see nachos.machine.Machine#getShellProgramName
+	 */
+	public void run() {
+		super.run();
+
+		UserProcess process = UserProcess.newUserProcess();
+
+		String shellProgram = Machine.getShellProgramName();
+		Lib.assertTrue(process.execute(shellProgram, new String[] {}));
+
+		KThread.currentThread().finish();
+	}
+
+	/**
+	 * Terminate this kernel. Never returns.
+	 */
+	public void terminate() {
+		super.terminate();
+	}
+
+	/** Globally accessible reference to the synchronized console. */
+	public static SynchConsole console;
+
+	// dummy variables to make javac smarter
+	private static Coff dummy1 = null;
 
 	public static Lock ListLock;
-    public static LinkedList <Integer> AvailablePages = new LinkedList <Integer>();
-	public static Node<UserProcess> processes = new Node<UserProcess>(null);
+	public static LinkedList<Integer> AvailablePages = new LinkedList<Integer>();
 
 	public static Semaphore physPageMutex;
-	
+
 	public static Semaphore processIDMutex;
-	
+
 	public static int processID;
-	
+
 	public static int processCount;
 	public static Semaphore pCountMutex;
-	
-	//References the root process
-public static UserProcess root = null;
+
+	// References the root process
+	public static UserProcess root = null;
 }
