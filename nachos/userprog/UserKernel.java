@@ -29,11 +29,7 @@ public class UserKernel extends ThreadedKernel {
 
 		processCount = 0;
 		pCountMutex = new Semaphore(1);
-
-		// Initializing physical pages
 		physPageMutex = new Semaphore(1);
-		// physicalPages = new LinkedList<Integer>();
-
 		processIDMutex = new Semaphore(1);
 		processID = 0;
 		// PhysPageSem = new Semaphore(1);
@@ -117,6 +113,8 @@ public class UserKernel extends ThreadedKernel {
 		super.run();
 
 		UserProcess process = UserProcess.newUserProcess();
+		
+		root = process;
 
 		String shellProgram = Machine.getShellProgramName();
 		Lib.assertTrue(process.execute(shellProgram, new String[] {}));

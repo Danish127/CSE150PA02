@@ -38,7 +38,8 @@ public class UserProcess {
 		
 		statusLock = new Lock();
 		UserKernel.processIDMutex.P();
-		processID = UserKernel.processID++;
+		UserKernel.processID++;
+		processID = UserKernel.processID;
 		UserKernel.processIDMutex.V();
 		exitStatus = null;
 		joinCondition = new Condition(statusLock);
@@ -459,7 +460,6 @@ public class UserProcess {
 
 		Machine.halt();
 
-		Lib.assertNotReached("Machine.halt() did not halt machine!");
 		return 0;
 
 	}
@@ -496,11 +496,8 @@ public class UserProcess {
 			if (myFileList[i] != null)
 				myFileList[i].close();
 		}
-
-		// TODO: Still need to return status to parent somehow or set parent
 		statusLock.acquire();
 		exitStatus = status;
-		//this.parent
 		statusLock.release();
 
 		parentMutex.P();
@@ -516,6 +513,10 @@ public class UserProcess {
 			aChild.parentMutex.P();
 			aChild.parent = null;
 			aChild.parentMutex.V();
+		}
+		
+		if(UserKernel.root == this){
+			handleHalt();
 		}
 
 		// Handles calling terminate when this is the last process
@@ -593,30 +594,59 @@ public class UserProcess {
 	}
 
 	private int handleJoin(int pid, int status) {
+		/**
+		 * Suspend execution of the current process until the child process specified
+		 * by the processID argument has exited. If the child has already exited by the
+		 * time of the call, returns immediately. When the current process resumes, it
+		 * disowns the child process, so that join() cannot be used on that process
+		 * again.
+		 *
+		 * processID is the process ID of the child process, returned by exec().
+		 *
+		 * status points to an integer where the exit status of the child process will
+		 * be stored. This is the value the child passed to exit(). If the child exited
+		 * because of an unhandled exception, the value stored is not defined.
+		 *
+		 * If the child exited normally, returns 1. If the child exited as a result of
+		 * an unhandled exception, returns 0. If processID does not refer to a child
+		 * process of the current process, returns -1.
+		 */
+
+		/*
+		 * if(parentId == null || childId == null){  //If the process is empty, quit
+        	Return 0;  //quit
+			}
+    		Int returnStatus = childId.returnCode; //try to shutdown
+    		while(returnStatus == null){  //if not shutdown
+        	returnStatus = childId.returnCode;  //try again
+        	if(returnStatus){  //if shutdown
+            	childId = null;  //wipe process ID
+            	Return returnStatus;  //return the return status
+        	}
+		 * 
+		 * 
+		 * 
+		 */
+		if (pid < 0 || status < 0){
+			return -1;
+		}
 		if (!children.containsKey(pid)) {
 			return -1;
 		}
 
 		UserProcess child = children.get(pid);
 
-		// Acquire child's lock so we can look at it
 		child.statusLock.acquire();
 
-		// Lock should appropriately handle synchronization of child's status
 		Integer childStatus = child.exitStatus;
 
 		if (childStatus == null) {
-			/*statusLock.acquire();
-			child.statusLock.release();
-			joinCondition.sleep();
-			statusLock.release();*/
 			child.statusLock.release();
 			statusLock.acquire();
 			joinCondition.sleep();
 			statusLock.release();
 
 			child.statusLock.acquire();
-			// Status better be in the table now
 			childStatus = child.exitStatus;
 
 		}
@@ -650,9 +680,9 @@ public class UserProcess {
 			return -1;
 		}
 
-		OpenFile myFile = Machine.stubFileSystem().open(name, true);// my file
+		//OpenFile myFile = Machine.stubFileSystem().open(name, true);// my file
 																	// created
-		// OpenFile myfile = ThreadedKernal.fileSystem.open(myfile, true);
+		OpenFile myFile = ThreadedKernel.fileSystem.open(name, true);
 		// original implementation
 
 		/*
@@ -688,10 +718,10 @@ public class UserProcess {
 		if (name == null)
 			return -1;
 
-		OpenFile myFile = Machine.stubFileSystem().open(name, false);
+		//OpenFile myFile = Machine.stubFileSystem().open(name, false);
 		// Original Implementation: OpenFile myfile =
 		// ThreadedKernal.fileSystem.open(myfile, false);
-
+		OpenFile myFile = ThreadedKernel.fileSystem.open(name, false);
 		if (myFile == null)
 			return -1;
 
@@ -804,24 +834,6 @@ public class UserProcess {
 		// Original implementation
 		return 0;
 
-	}
-
-	public void incProcessCount() {
-		UserKernel.pCountMutex.P();
-
-		UserKernel.processCount++;
-
-		UserKernel.pCountMutex.V();
-	}
-
-	public void decProcessCount() {
-		UserKernel.pCountMutex.P();
-
-		// If the last process then terminate the system
-		if (--UserKernel.processCount == 0)
-			Kernel.kernel.terminate();
-
-		UserKernel.pCountMutex.V();
 	}
 
 	private static final int syscallHalt = 0, syscallExit = 1, syscallExec = 2,
